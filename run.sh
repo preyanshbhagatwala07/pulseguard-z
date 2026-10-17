@@ -22,6 +22,7 @@ javac -d target/classes -sourcepath src/main/java \
     src/main/java/com/ibmz/pulseguard/clinical/*.java \
     src/main/java/com/ibmz/pulseguard/audit/*.java \
     src/main/java/com/ibmz/pulseguard/teleicu/*.java \
+    src/main/java/com/ibmz/pulseguard/report/*.java \
     src/main/java/com/ibmz/pulseguard/model/*.java \
     src/main/java/com/ibmz/pulseguard/engine/*.java \
     src/main/java/com/ibmz/pulseguard/service/*.java \

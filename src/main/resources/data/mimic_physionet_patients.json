@@ -1,0 +1,51 @@
+[
+  {
+    "patientId": "MIMIC-CIN-0842",
+    "abhaId": "91-1049-5829-3910",
+    "name": "Mohammad Farooq",
+    "age": 68,
+    "gender": "Male",
+    "facility": "Civil Hospital Valsad (District HQ - ICU 3)",
+    "admissionDiagnosis": "Severe Urosepsis",
+    "outcome": "Developed Septic Shock at Hour 14; Survived with Hour-1 Resuscitation",
+    "trajectory": [
+      { "hour": 1, "hr": 84, "sbp": 122, "dbp": 78, "rr": 16, "temp": 37.2, "spo2": 97, "lactate": 1.4, "wbc": 10.2 },
+      { "hour": 4, "hr": 92, "sbp": 116, "dbp": 74, "rr": 18, "temp": 37.8, "spo2": 96, "lactate": 1.8, "wbc": 12.1 },
+      { "hour": 8, "hr": 108, "sbp": 104, "dbp": 66, "rr": 22, "temp": 38.6, "spo2": 94, "lactate": 2.4, "wbc": 15.4 },
+      { "hour": 11, "hr": 118, "sbp": 94, "dbp": 58, "rr": 25, "temp": 39.1, "spo2": 91, "lactate": 3.6, "wbc": 18.2 },
+      { "hour": 14, "hr": 134, "sbp": 78, "dbp": 44, "rr": 30, "temp": 39.4, "spo2": 87, "lactate": 5.4, "wbc": 22.8 },
+      { "hour": 18, "hr": 110, "sbp": 98, "dbp": 60, "rr": 22, "temp": 38.2, "spo2": 94, "lactate": 3.1, "wbc": 17.5 }
+    ]
+  },
+  {
+    "patientId": "MIMIC-CIN-1920",
+    "abhaId": "91-8392-1049-5729",
+    "name": "Pooja Verma",
+    "age": 29,
+    "gender": "Female",
+    "facility": "Dharampur Rural PHC (Triage Bay 1)",
+    "admissionDiagnosis": "Postpartum Infection & Occult Circulatory Failure",
+    "outcome": "Emergency 108 Transfer Initiated; ICU Bed Auto-Reserved",
+    "trajectory": [
+      { "hour": 1, "hr": 78, "sbp": 114, "dbp": 72, "rr": 15, "temp": 37.0, "spo2": 98, "lactate": 1.2, "wbc": 9.5 },
+      { "hour": 3, "hr": 96, "sbp": 108, "dbp": 68, "rr": 20, "temp": 38.2, "spo2": 96, "lactate": 2.1, "wbc": 13.0 },
+      { "hour": 6, "hr": 114, "sbp": 92, "dbp": 56, "rr": 24, "temp": 38.9, "spo2": 92, "lactate": 3.2, "wbc": 16.8 },
+      { "hour": 9, "hr": 128, "sbp": 82, "dbp": 48, "rr": 28, "temp": 39.2, "spo2": 89, "lactate": 4.6, "wbc": 19.5 }
+    ]
+  },
+  {
+    "patientId": "MIMIC-CIN-3104",
+    "abhaId": "91-2384-9102-4821",
+    "name": "Rameshwar Patel",
+    "age": 58,
+    "gender": "Male",
+    "facility": "Civil Hospital Valsad (District HQ - Ward Bed 1)",
+    "admissionDiagnosis": "Elective Cholecystectomy Post-Op",
+    "outcome": "Stable Homeostasis Throughout Stay",
+    "trajectory": [
+      { "hour": 1, "hr": 72, "sbp": 124, "dbp": 78, "rr": 14, "temp": 36.6, "spo2": 99, "lactate": 1.0, "wbc": 7.4 },
+      { "hour": 6, "hr": 76, "sbp": 120, "dbp": 76, "rr": 15, "temp": 36.8, "spo2": 98, "lactate": 1.1, "wbc": 7.6 },
+      { "hour": 12, "hr": 74, "sbp": 118, "dbp": 75, "rr": 14, "temp": 36.7, "spo2": 98, "lactate": 1.0, "wbc": 7.5 }
+    ]
+  }
+]

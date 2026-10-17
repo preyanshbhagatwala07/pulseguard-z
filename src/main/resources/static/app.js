@@ -165,12 +165,32 @@ function renderBeds(beds) {
 
         <div class="card-actions">
           <button class="btn btn-sm btn-outline" onclick="viewFhirBundle('${bed.bedId}')">
-            View HL7 FHIR R4 Bundle
+            HL7 FHIR R4
+          </button>
+          <button class="btn btn-sm btn-outline" onclick="viewSmsPacket('${bed.bedId}')">
+            2G Offline SMS
+          </button>
+          <button class="btn btn-sm btn-primary" onclick="printReferralSlip('${bed.bedId}')">
+            Print ABDM Referral Slip
           </button>
         </div>
       </div>
     `;
   }).join('');
+}
+
+function printReferralSlip(bedId) {
+  window.open(`/api/v1/referral?bedId=${bedId}`, '_blank');
+}
+
+async function viewSmsPacket(bedId) {
+  try {
+    const res = await fetch(`/api/v1/sms?bedId=${bedId}`);
+    const data = await res.json();
+    alert(`[OFFLINE 2G / GSM DISPATCH PACKET - FITS 140 BYTES]\n\nPayload (${data.payloadBytes} bytes):\n${data.smsPacket}\n\nTransmittable over cellular 2G SMS / USSD from remote PHCs without internet.`);
+  } catch (err) {
+    alert('SMS preview error: ' + err);
+  }
 }
 
 async function viewFhirBundle(bedId) {

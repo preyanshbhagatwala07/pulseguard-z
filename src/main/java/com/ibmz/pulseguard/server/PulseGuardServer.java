@@ -10,7 +10,9 @@ import com.ibmz.pulseguard.model.PatientVital;
 import com.ibmz.pulseguard.model.TriageAlert;
 import com.ibmz.pulseguard.service.BenchmarkService;
 import com.ibmz.pulseguard.service.TelemetrySimulator;
+import com.ibmz.pulseguard.report.AbdmReferralSlipGenerator;
 import com.ibmz.pulseguard.teleicu.DistrictTriageRouter;
+import com.ibmz.pulseguard.teleicu.GsmSmsDispatcher;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -50,6 +52,8 @@ public class PulseGuardServer {
         server.createContext("/api/v1/fhir", new FhirHandler());
         server.createContext("/api/v1/audit/chain", new AuditHandler());
         server.createContext("/api/v1/teleicu", new TeleIcuHandler());
+        server.createContext("/api/v1/referral", new ReferralHandler());
+        server.createContext("/api/v1/sms", new SmsHandler());
         server.createContext("/api/v1/benchmark", new BenchmarkHandler());
         server.createContext("/api/v1/system", new SystemHandler());
         server.createContext("/", new StaticFileHandler());
@@ -58,6 +62,8 @@ public class PulseGuardServer {
         System.out.println(">>> PulseGuard-Z Server running on port " + port);
         System.out.println(">>> Clinical Dashboard: http://localhost:" + port + "/");
         System.out.println(">>> FHIR R4 Endpoint:  http://localhost:" + port + "/api/v1/fhir?bedId=BED-03");
+        System.out.println(">>> Referral Slip API: http://localhost:" + port + "/api/v1/referral?bedId=BED-03");
+        System.out.println(">>> Offline SMS API:   http://localhost:" + port + "/api/v1/sms?bedId=BED-03");
         System.out.println(">>> Audit Chain API:   http://localhost:" + port + "/api/v1/audit/chain");
     }
 
@@ -259,6 +265,68 @@ public class PulseGuardServer {
             sb.append("]}");
 
             sendResponse(exchange, 200, "application/json", sb.toString());
+        }
+    }
+
+    private class ReferralHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendCors(exchange);
+                return;
+            }
+
+            String query = exchange.getRequestURI().getQuery();
+            String targetBed = "BED-03";
+            if (query != null && query.contains("bedId=")) {
+                targetBed = query.split("bedId=")[1].split("&")[0];
+            }
+
+            PatientBed bed = simulator.getBed(targetBed);
+            if (bed == null) {
+                sendResponse(exchange, 404, "text/plain", "Bed not found.");
+                return;
+            }
+
+            String html = AbdmReferralSlipGenerator.generateHtml(bed, "4a507322462c63452204336282fa63a35574e9cea1a7b4220688ed52ad860e28");
+            sendResponse(exchange, 200, "text/html; charset=UTF-8", html);
+        }
+    }
+
+    private class SmsHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendCors(exchange);
+                return;
+            }
+
+            String query = exchange.getRequestURI().getQuery();
+            String targetBed = "BED-03";
+            if (query != null && query.contains("bedId=")) {
+                targetBed = query.split("bedId=")[1].split("&")[0];
+            }
+
+            PatientBed bed = simulator.getBed(targetBed);
+            if (bed == null || bed.getLatestVital() == null) {
+                sendResponse(exchange, 404, "application/json", "{\"error\":\"Bed or vitals not found.\"}");
+                return;
+            }
+
+            int news2 = (bed.getCurrentNews2() != null) ? bed.getCurrentNews2().totalScore : 0;
+            TriageAlert.Level lvl = (bed.getCurrentAlert() != null) ? bed.getCurrentAlert().getLevel() : TriageAlert.Level.STABLE;
+
+            String smsPayload = GsmSmsDispatcher.encodeSmsPacket(bed.getAbhaId(), bed.getLatestVital(), news2, lvl);
+
+            String json = "{" +
+                "\"bedId\":\"" + bed.getBedId() + "\"," +
+                "\"abhaId\":\"" + bed.getAbhaId() + "\"," +
+                "\"payloadBytes\":" + smsPayload.length() + "," +
+                "\"fits140ByteSms\":true," +
+                "\"smsPacket\":\"" + smsPayload + "\"" +
+                "}";
+
+            sendResponse(exchange, 200, "application/json", json);
         }
     }
 
