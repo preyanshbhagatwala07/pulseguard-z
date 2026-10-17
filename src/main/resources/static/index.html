@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PulseGuard-Z | Real-Time ICU Triage AI on IBM Z & LinuxONE</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Top Navigation / Enterprise Header -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="logo-pulse">
+        <span class="pulse-ring"></span>
+        <span class="pulse-dot"></span>
+      </div>
+      <div>
+        <h1 class="brand-title">PulseGuard<span class="accent">-Z</span></h1>
+        <p class="brand-sub">Real-Time ICU Sepsis Triage Engine &bull; Track: Real-Time AI for Critical Decisions</p>
+      </div>
+    </div>
+    <div class="header-badges">
+      <span class="badge ibm-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        <span id="platform-arch">IBM LinuxONE / s390x Ready</span>
+      </span>
+      <span class="badge live-badge">
+        <span class="live-dot"></span> LIVE TELEMETRY
+      </span>
+      <button class="btn btn-primary" onclick="runBenchmark()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Run Benchmark
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="dashboard-container">
+    <!-- Real-Time Metrics Strip -->
+    <section class="metrics-strip">
+      <div class="metric-card">
+        <div class="metric-label">Inference Latency</div>
+        <div class="metric-value text-accent" id="metric-latency">0.08 <span class="unit">µs</span></div>
+        <div class="metric-sub">Sub-millisecond in-transaction scoring</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Decision Throughput</div>
+        <div class="metric-value" id="metric-throughput">1,250,000 <span class="unit">decisions/s</span></div>
+        <div class="metric-sub">Pure Java SIMD vector acceleration</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Active ICU Beds</div>
+        <div class="metric-value" id="metric-beds">6 <span class="unit">Monitored</span></div>
+        <div class="metric-sub">Continuous physiological surveillance</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Critical Sepsis Alerts</div>
+        <div class="metric-value text-danger" id="metric-critical">1 <span class="unit">Active</span></div>
+        <div class="metric-sub">Hour-1 Sepsis Bundle initiated</div>
+      </div>
+    </section>
+
+    <!-- ICU Ward Beds Grid -->
+    <section class="ward-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">ICU Triage Overview</h2>
+          <p class="section-desc">Real-time bedside vitals evaluated continuously against Sepsis-3 clinical consensus definitions</p>
+        </div>
+        <div class="legend">
+          <span class="legend-item"><span class="indicator-dot stable"></span> Stable (&lt;35%)</span>
+          <span class="legend-item"><span class="indicator-dot elevated"></span> Elevated Risk (35-70%)</span>
+          <span class="legend-item"><span class="indicator-dot critical"></span> Critical Sepsis (&gt;70%)</span>
+        </div>
+      </div>
+
+      <div class="beds-grid" id="beds-container">
+        <!-- Bed cards rendered dynamically by app.js -->
+        <div class="loading-state">Connecting to PulseGuard-Z telemetry stream...</div>
+      </div>
+    </section>
+
+    <!-- Interactive Clinical Testing Sandbox -->
+    <section class="test-sandbox">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Interactive Clinical Telemetry Sandbox</h2>
+          <p class="section-desc">Simulate a high-frequency telemetry packet to test instant AI triage response</p>
+        </div>
+        <div class="preset-buttons">
+          <button class="btn btn-sm btn-outline" onclick="loadPreset('normal')">Preset: Normal Recovery</button>
+          <button class="btn btn-sm btn-outline" onclick="loadPreset('elevated')">Preset: Developing Sepsis</button>
+          <button class="btn btn-sm btn-outline text-danger" onclick="loadPreset('shock')">Preset: Acute Septic Shock</button>
+        </div>
+      </div>
+
+      <form id="test-form" class="sandbox-form" onsubmit="submitTelemetry(event)">
+        <div class="form-grid">
+          <div class="input-group">
+            <label>Heart Rate (bpm)</label>
+            <input type="number" id="inp-hr" value="128" step="1" required>
+          </div>
+          <div class="input-group">
+            <label>Systolic BP (mmHg)</label>
+            <input type="number" id="inp-sbp" value="82" step="1" required>
+          </div>
+          <div class="input-group">
+            <label>Diastolic BP (mmHg)</label>
+            <input type="number" id="inp-dbp" value="48" step="1" required>
+          </div>
+          <div class="input-group">
+            <label>Respiratory Rate (bpm)</label>
+            <input type="number" id="inp-rr" value="28" step="1" required>
+          </div>
+          <div class="input-group">
+            <label>Temperature (°C)</label>
+            <input type="number" id="inp-temp" value="39.2" step="0.1" required>
+          </div>
+          <div class="input-group">
+            <label>Oxygen Saturation SpO2 (%)</label>
+            <input type="number" id="inp-spo2" value="88" step="1" required>
+          </div>
+          <div class="input-group">
+            <label>Lactate (mmol/L)</label>
+            <input type="number" id="inp-lactate" value="4.6" step="0.1" required>
+          </div>
+          <div class="input-group">
+            <label>WBC Count (x10⁹/L)</label>
+            <input type="number" id="inp-wbc" value="18.5" step="0.1" required>
+          </div>
+        </div>
+        <div class="form-footer">
+          <button type="submit" class="btn btn-danger">Evaluate Telemetry (In-Transaction AI)</button>
+          <div id="test-result" class="test-result-box hidden"></div>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <!-- Benchmark Modal -->
+  <div id="bench-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>PulseGuard-Z Performance Benchmark</h3>
+        <button class="close-btn" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-content">
+        Running 50,000 real-time inference decisions on Java runtime...
+      </div>
+    </div>
+  </div>
+
+  <footer class="app-footer">
+    <p>PulseGuard-Z &bull; Built with Java for the <strong>IBM Z Datathon 2026</strong> &bull; Team CodeBuilders</p>
+    <p class="tech-stack-note">Engineered for IBM LinuxONE Community Cloud &amp; IBM Z Pervasive Encryption</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
