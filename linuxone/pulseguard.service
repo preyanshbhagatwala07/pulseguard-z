@@ -1,0 +1,18 @@
+[Unit]
+Description=PulseGuard-Z National Tele-ICU Sepsis Triage Engine (IBM LinuxONE & s390x)
+After=network.target
+
+[Service]
+Type=simple
+User=linux1
+WorkingDirectory=/home/linux1/pulseguard-z
+ExecStart=/usr/bin/java -Xms512m -Xmx2g -XX:+UseG1GC -cp target/classes com.ibmz.pulseguard.Main 8080
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+# CPACF and memory mapped IO tuning
+Environment=JAVA_TOOL_OPTIONS="-XX:+AlwaysPreTouch"
+
+[Install]
+WantedBy=multi-user.target

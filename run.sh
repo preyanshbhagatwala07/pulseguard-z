@@ -30,15 +30,17 @@ javac -d target/classes -sourcepath src/main/java \
     src/main/java/com/ibmz/pulseguard/model/*.java \
     src/main/java/com/ibmz/pulseguard/engine/*.java \
     src/main/java/com/ibmz/pulseguard/service/*.java \
-    src/main/java/com/ibmz/pulseguard/server/*.java
+    src/main/java/com/ibmz/pulseguard/server/*.java \
+    src/main/java/com/ibmz/pulseguard/diagnostics/*.java
 
 echo "[INFO] Copying web assets..."
 mkdir -p target/classes/static
 cp -r src/main/resources/static/* target/classes/static/ 2>/dev/null || true
 
 echo "==================================================="
-echo "  Launching PulseGuard-Z Server on port 8080       "
+echo "  Launching PulseGuard-Z Telemetry Engine          "
 echo "  Access Dashboard: http://localhost:8080          "
 echo "==================================================="
 
-exec java -XX:+UseZGC -XX:+AlwaysPreTouch -cp target/classes com.ibmz.pulseguard.Main 8080
+PORT=${1:-8080}
+exec java -XX:+UseG1GC -XX:+AlwaysPreTouch -cp target/classes com.ibmz.pulseguard.Main "$@"
