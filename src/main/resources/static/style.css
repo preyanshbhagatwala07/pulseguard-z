@@ -821,3 +821,173 @@ body {
   font-size: 0.72rem;
   color: #64748b;
 }
+
+/* ==========================================================================
+   Live ICU Lead-II Cardiac Oscillograph Strip (60 FPS Canvas)
+   ========================================================================== */
+.ecg-monitor-card {
+  background: #020617;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(0, 0, 0, 0.8);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.ecg-monitor-card.critical-alert {
+  border-color: rgba(239, 68, 68, 0.7);
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.3), inset 0 0 20px rgba(239, 68, 68, 0.15);
+  animation: pulse-border-red 1.2s infinite ease-in-out;
+}
+
+@keyframes pulse-border-red {
+  0%, 100% { border-color: rgba(239, 68, 68, 0.4); }
+  50% { border-color: rgba(239, 68, 68, 0.9); }
+}
+
+.ecg-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  background: rgba(15, 23, 42, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.ecg-title-block {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ecg-pulse-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  display: inline-block;
+  animation: ecg-heartbeat 0.8s infinite;
+}
+
+.ecg-monitor-card.critical-alert .ecg-pulse-indicator {
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+  animation: ecg-heartbeat 0.45s infinite;
+}
+
+@keyframes ecg-heartbeat {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.4); opacity: 1; }
+}
+
+.ecg-lead-tag {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.ecg-patient-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.ecg-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ecg-label {
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.ecg-select {
+  background: #0f172a;
+  color: #f1f5f9;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
+.ecg-screen-wrapper {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  background: #010409;
+  background-image: 
+    linear-gradient(rgba(16, 185, 129, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 185, 129, 0.07) 1px, transparent 1px),
+    linear-gradient(rgba(16, 185, 129, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 185, 129, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+}
+
+#ecg-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.ecg-hud {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  display: flex;
+  gap: 1.5rem;
+  pointer-events: none;
+}
+
+.hud-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: var(--font-mono);
+}
+
+.hud-label {
+  font-size: 0.68rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.hud-val {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+  text-shadow: 0 0 10px currentColor;
+}
+
+.hud-unit {
+  font-size: 0.65rem;
+  color: #94a3b8;
+}
+
+.hud-item.hr .hud-val { color: #10b981; }
+.ecg-monitor-card.critical-alert .hud-item.hr .hud-val { color: #ef4444; }
+
+.hud-item.rhythm .hud-val {
+  font-size: 0.88rem;
+  margin-top: 0.2rem;
+  color: #38bdf8;
+  max-width: 180px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.hud-item.spo2 .hud-val { color: #38bdf8; }
+.hud-item.map .hud-val { color: #fbbf24; }
+

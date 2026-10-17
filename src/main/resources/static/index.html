@@ -98,6 +98,55 @@
           </div>
         </div>
 
+        <!-- Live ICU Lead-II Cardiac Oscillograph Strip (60 FPS Canvas) -->
+        <div class="ecg-monitor-card" id="ecg-monitor-card">
+          <div class="ecg-header">
+            <div class="ecg-title-block">
+              <span class="ecg-pulse-indicator"></span>
+              <span class="ecg-lead-tag">LEAD II &bull; 25mm/s &bull; 10mm/mV</span>
+              <span class="ecg-patient-name" id="ecg-patient-name">BED-03: Sunita Devi (Critical Septic Shock)</span>
+            </div>
+            <div class="ecg-controls">
+              <label for="ecg-bed-select" class="ecg-label">Monitor Bed:</label>
+              <select id="ecg-bed-select" class="ecg-select" onchange="onEcgBedChange(this.value)">
+                <option value="BED-03" selected>BED-03: Sunita Devi (Shock - 132 bpm)</option>
+                <option value="BED-01">BED-01: Rajesh Kumar (Stable - 74 bpm)</option>
+                <option value="BED-02">BED-02: Priya Sharma (Elevated - 104 bpm)</option>
+                <option value="BED-04">BED-04: Amit Patel (Post-Op - 82 bpm)</option>
+                <option value="BED-05">BED-05: Meena Kumari (COPD - 96 bpm)</option>
+                <option value="BED-06">BED-06: Vikram Singh (Trauma - 118 bpm)</option>
+              </select>
+              <button class="btn btn-sm btn-outline" id="ecg-audio-btn" onclick="toggleEcgAudio()">
+                🔊 Beep: OFF
+              </button>
+            </div>
+          </div>
+          <div class="ecg-screen-wrapper">
+            <canvas id="ecg-canvas" width="1200" height="180"></canvas>
+            <div class="ecg-hud">
+              <div class="hud-item hr">
+                <span class="hud-label">HR</span>
+                <span class="hud-val" id="ecg-hr-display">132</span>
+                <span class="hud-unit">BPM</span>
+              </div>
+              <div class="hud-item rhythm">
+                <span class="hud-label">RHYTHM</span>
+                <span class="hud-val rhythm-name" id="ecg-rhythm-display">Sinus Tachycardia</span>
+              </div>
+              <div class="hud-item spo2">
+                <span class="hud-label">SpO₂</span>
+                <span class="hud-val" id="ecg-spo2-display">87</span>
+                <span class="hud-unit">%</span>
+              </div>
+              <div class="hud-item map">
+                <span class="hud-label">MAP</span>
+                <span class="hud-val" id="ecg-map-display">55</span>
+                <span class="hud-unit">mmHg</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="beds-grid" id="beds-container">
           <div class="loading-state">Connecting to PulseGuard-Z telemetry stream...</div>
         </div>

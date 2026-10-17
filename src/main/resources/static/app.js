@@ -517,3 +517,242 @@ async function runStressTest() {
     container.innerHTML = `<span class="text-danger">Stress test error: ${err}</span>`;
   }
 }
+
+/* ==========================================================================
+   Live ICU Lead-II Cardiac Oscillograph Strip (60 FPS Canvas Engine)
+   ========================================================================== */
+let ecgCanvas = null;
+let ecgCtx = null;
+let ecgAnimationId = null;
+let ecgCurrentX = 0;
+let ecgLastY = null;
+let ecgAudioCtx = null;
+let ecgAudioEnabled = false;
+let ecgLastBeepTime = 0;
+
+let currentEcgBed = {
+  id: 'BED-03',
+  name: 'Sunita Devi (Critical Septic Shock)',
+  hr: 132,
+  spo2: 87,
+  map: 55,
+  isCritical: true,
+  rhythm: 'Sinus Tachycardia'
+};
+
+function initEcgEngine() {
+  ecgCanvas = document.getElementById('ecg-canvas');
+  if (!ecgCanvas) return;
+  ecgCtx = ecgCanvas.getContext('2d');
+
+  function resizeCanvas() {
+    if (!ecgCanvas) return;
+    const rect = ecgCanvas.getBoundingClientRect();
+    ecgCanvas.width = rect.width * (window.devicePixelRatio || 1);
+    ecgCanvas.height = rect.height * (window.devicePixelRatio || 1);
+    ecgCtx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+    ecgCurrentX = 0;
+    ecgLastY = null;
+    ecgCtx.clearRect(0, 0, rect.width, rect.height);
+  }
+
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  ecgCurrentX = 0;
+  ecgLastY = null;
+
+  startEcgLoop();
+}
+
+function startEcgLoop() {
+  if (ecgAnimationId) cancelAnimationFrame(ecgAnimationId);
+
+  let lastTimestamp = performance.now();
+  let cycleProgress = 0; // 0.0 to 1.0
+
+  function renderEcgFrame(now) {
+    if (!ecgCanvas || !ecgCtx) return;
+    const dt = (now - lastTimestamp) / 1000.0;
+    lastTimestamp = now;
+
+    const rect = ecgCanvas.getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
+    const midY = h * 0.58;
+
+    // Heart rate governs cycle duration
+    const bpm = Math.max(40, Math.min(220, currentEcgBed.hr));
+    const cycleDuration = 60.0 / bpm; // seconds per beat
+    cycleProgress = (cycleProgress + dt / cycleDuration) % 1.0;
+
+    // Advance sweep cursor across canvas (approx 3.5 seconds across screen)
+    const sweepSpeed = w / 3.5;
+    const prevX = ecgCurrentX;
+    ecgCurrentX += sweepSpeed * dt;
+
+    if (ecgCurrentX >= w) {
+      ecgCurrentX = 0;
+      ecgLastY = null;
+    }
+
+    // Clear sweep trail ahead (phosphor erasing effect)
+    const clearWidth = 32;
+    ecgCtx.clearRect(ecgCurrentX, 0, clearWidth, h);
+
+    // Compute Lead-II ECG voltage at current phase
+    let voltage = 0.0; // in arbitrary units
+    const p = cycleProgress;
+
+    // Lead-II Cardiac Waveform Synthesizer
+    if (p >= 0.10 && p < 0.20) {
+      // P-wave (atrial depolarization)
+      const t = (p - 0.10) / 0.10;
+      voltage = 0.15 * Math.sin(t * Math.PI);
+    } else if (p >= 0.22 && p < 0.25) {
+      // Q-wave (septal depolarization)
+      const t = (p - 0.22) / 0.03;
+      voltage = -0.18 * Math.sin(t * Math.PI);
+    } else if (p >= 0.25 && p < 0.31) {
+      // R-wave (ventricular depolarization - sharp peak)
+      const t = (p - 0.25) / 0.06;
+      voltage = 1.25 * Math.sin(t * Math.PI);
+
+      // Trigger audio beep at R-peak
+      if (t >= 0.4 && t <= 0.6 && (now - ecgLastBeepTime) > (cycleDuration * 800)) {
+        triggerEcgBeep(currentEcgBed.isCritical);
+        ecgLastBeepTime = now;
+      }
+    } else if (p >= 0.31 && p < 0.35) {
+      // S-wave (ventricular late depolarization)
+      const t = (p - 0.31) / 0.04;
+      voltage = -0.35 * Math.sin(t * Math.PI);
+    } else if (p >= 0.35 && p < 0.42) {
+      // ST-segment: ST depression in septic myocardial injury
+      voltage = currentEcgBed.isCritical ? -0.12 : 0.0;
+    } else if (p >= 0.42 && p < 0.60) {
+      // T-wave (ventricular repolarization)
+      const t = (p - 0.42) / 0.18;
+      voltage = 0.28 * Math.sin(t * Math.PI);
+      if (currentEcgBed.isCritical) voltage *= 0.7; // Flattened/inverted T-wave
+    } else {
+      // Baseline with micro physiological noise
+      voltage = (Math.random() - 0.5) * 0.02;
+    }
+
+    // Convert voltage to Y coordinate (gain 70px)
+    const currentY = midY - (voltage * 68);
+
+    // Draw the green or red phosphor vector line
+    ecgCtx.save();
+    ecgCtx.beginPath();
+    const startY = ecgLastY !== null ? ecgLastY : currentY;
+    ecgCtx.moveTo(prevX, startY);
+    ecgCtx.lineTo(ecgCurrentX, currentY);
+
+    if (currentEcgBed.isCritical) {
+      ecgCtx.strokeStyle = '#ef4444';
+      ecgCtx.shadowColor = '#ef4444';
+    } else {
+      ecgCtx.strokeStyle = '#10b981';
+      ecgCtx.shadowColor = '#10b981';
+    }
+    ecgCtx.shadowBlur = 6;
+    ecgCtx.lineWidth = 2.0;
+    ecgCtx.lineCap = 'round';
+    ecgCtx.stroke();
+    ecgCtx.restore();
+
+    ecgLastY = currentY;
+    ecgAnimationId = requestAnimationFrame(renderEcgFrame);
+  }
+
+  ecgAnimationId = requestAnimationFrame(renderEcgFrame);
+}
+
+function onEcgBedChange(bedId) {
+  const selectElem = document.getElementById('ecg-bed-select');
+  const cardElem = document.getElementById('ecg-monitor-card');
+  const nameElem = document.getElementById('ecg-patient-name');
+  const hrElem = document.getElementById('ecg-hr-display');
+  const rhythmElem = document.getElementById('ecg-rhythm-display');
+  const spo2Elem = document.getElementById('ecg-spo2-display');
+  const mapElem = document.getElementById('ecg-map-display');
+
+  const bedCatalog = {
+    'BED-01': { id: 'BED-01', name: 'Rajesh Kumar (Stable Post-Op)', hr: 74, spo2: 98, map: 92, isCritical: false, rhythm: 'Normal Sinus Rhythm' },
+    'BED-02': { id: 'BED-02', name: 'Priya Sharma (Elevated NEWS2)', hr: 104, spo2: 93, map: 74, isCritical: false, rhythm: 'Sinus Tachycardia' },
+    'BED-03': { id: 'BED-03', name: 'Sunita Devi (Critical Septic Shock)', hr: 132, spo2: 87, map: 55, isCritical: true, rhythm: 'Sinus Tachycardia (Shock)' },
+    'BED-04': { id: 'BED-04', name: 'Amit Patel (Post-Appendectomy)', hr: 82, spo2: 97, map: 88, isCritical: false, rhythm: 'Normal Sinus Rhythm' },
+    'BED-05': { id: 'BED-05', name: 'Meena Kumari (COPD Deterioration)', hr: 96, spo2: 91, map: 79, isCritical: false, rhythm: 'Sinus Rhythm (Hypoxic)' },
+    'BED-06': { id: 'BED-06', name: 'Vikram Singh (Poly-trauma)', hr: 118, spo2: 94, map: 71, isCritical: false, rhythm: 'Sinus Tachycardia' }
+  };
+
+  const b = bedCatalog[bedId] || bedCatalog['BED-03'];
+  currentEcgBed = { ...b };
+
+  if (cardElem) {
+    if (b.isCritical) cardElem.classList.add('critical-alert');
+    else cardElem.classList.remove('critical-alert');
+  }
+
+  if (nameElem) nameElem.textContent = `${b.id}: ${b.name}`;
+  if (hrElem) hrElem.textContent = b.hr;
+  if (rhythmElem) rhythmElem.textContent = b.rhythm;
+  if (spo2Elem) spo2Elem.textContent = b.spo2;
+  if (mapElem) mapElem.textContent = b.map;
+}
+
+function toggleEcgAudio() {
+  const btn = document.getElementById('ecg-audio-btn');
+  ecgAudioEnabled = !ecgAudioEnabled;
+
+  if (ecgAudioEnabled) {
+    if (!ecgAudioCtx) {
+      ecgAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (ecgAudioCtx.state === 'suspended') {
+      ecgAudioCtx.resume();
+    }
+    if (btn) {
+      btn.textContent = '🔊 Beep: ON';
+      btn.classList.add('btn-primary');
+      btn.classList.remove('btn-outline');
+    }
+  } else {
+    if (btn) {
+      btn.textContent = '🔇 Beep: OFF';
+      btn.classList.remove('btn-primary');
+      btn.classList.add('btn-outline');
+    }
+  }
+}
+
+function triggerEcgBeep(isCritical) {
+  if (!ecgAudioEnabled || !ecgAudioCtx) return;
+  try {
+    const osc = ecgAudioCtx.createOscillator();
+    const gain = ecgAudioCtx.createGain();
+
+    osc.type = 'sine';
+    // Authentic hospital monitor frequency: 880Hz (stable) vs 1100Hz (critical alarm)
+    osc.frequency.setValueAtTime(isCritical ? 1100 : 880, ecgAudioCtx.currentTime);
+
+    gain.gain.setValueAtTime(0.06, ecgAudioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ecgAudioCtx.currentTime + 0.08);
+
+    osc.connect(gain);
+    gain.connect(ecgAudioCtx.destination);
+
+    osc.start();
+    osc.stop(ecgAudioCtx.currentTime + 0.08);
+  } catch (e) {
+    console.warn('Audio beep error:', e);
+  }
+}
+
+// Attach ECG engine to DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(initEcgEngine, 200);
+});
+

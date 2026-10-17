@@ -12,6 +12,14 @@ import com.ibmz.pulseguard.teleicu.DistrictTriageRouter;
 public class Main {
 
     public static void main(String[] args) {
+        if (args.length > 0 && ("--diagnostics".equalsIgnoreCase(args[0]) || 
+                                "--verify".equalsIgnoreCase(args[0]) || 
+                                "-v".equalsIgnoreCase(args[0]) || 
+                                "diagnostics".equalsIgnoreCase(args[0]))) {
+            com.ibmz.pulseguard.diagnostics.EnterpriseDiagnostics.runAndPrint();
+            System.exit(0);
+        }
+
         int port = 8080;
         if (args.length > 0) {
             try {
