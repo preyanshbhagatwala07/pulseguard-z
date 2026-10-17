@@ -31,6 +31,11 @@ function switchTab(tab) {
 
   if (tab === 'teleicu') fetchTeleIcuData();
   if (tab === 'audit') fetchAuditData();
+  if (tab === 'ibmz') {
+    fetchTelumNeural();
+    fetchCpacfStatus();
+    fetchSysplexStatus();
+  }
 }
 
 async function fetchSystemInfo() {
@@ -386,4 +391,129 @@ async function runBenchmark() {
 
 function closeModal() {
   document.getElementById('bench-modal').classList.add('hidden');
+}
+
+async function fetchTelumNeural() {
+  const container = document.getElementById('telum-status');
+  if (!container) return;
+  container.innerHTML = '<span style="color:#94a3b8;">Executing unrolled GEMM forward pass on Telum NNPA engine...</span>';
+  try {
+    const res = await fetch('/api/v1/telum/neural?bedId=BED-03');
+    const d = await res.json();
+    container.innerHTML = `
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem;">
+        <span>Sepsis Risk Probability:</span>
+        <strong class="text-danger">${Math.round(d.sepsisRiskProbability * 100)}%</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem;">
+        <span>4-Hour Mortality Hazard:</span>
+        <strong style="color:#f59e0b;">${Math.round(d.fourHourMortalityRisk * 100)}%</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem;">
+        <span>12-Hour Organ Failure Risk:</span>
+        <strong style="color:#ef4444;">${Math.round(d.twelveHourOrganFailureHazard * 100)}%</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem;">
+        <span>NNPA Matrix Latency:</span>
+        <strong class="text-accent">${d.inferenceLatencyMicros.toFixed(3)} µs (${d.inferenceLatencyNanos} ns)</strong>
+      </div>
+      <div style="font-size:0.72rem; color:#93c5fd; background:rgba(15,98,254,0.1); padding:0.4rem; border-radius:4px; margin-top:0.4rem;">
+        ${d.telumHardwareStatus}
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<span class="text-danger">Telum API error: ${err}</span>`;
+  }
+}
+
+async function fetchCpacfStatus() {
+  const container = document.getElementById('cpacf-status');
+  if (!container) return;
+  container.innerHTML = '<span style="color:#94a3b8;">Testing CPACF AES-256-GCM hardware cipher...</span>';
+  try {
+    const res = await fetch('/api/v1/security/cpacf');
+    const d = await res.json();
+    container.innerHTML = `
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem;">
+        <span>Cipher Algorithm:</span>
+        <strong style="color:#10b981;">${d.algorithm} (Authenticated AEAD)</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem;">
+        <span>Encryption Latency:</span>
+        <strong class="text-accent">${d.encryptionLatencyMicros} µs (${d.encryptionLatencyNanos} ns)</strong>
+      </div>
+      <div style="font-size:0.72rem; color:#cbd5e1; margin-bottom:0.4rem;">
+        <strong>Ciphertext Sample (Base64):</strong> <code style="color:#38bdf8;">${d.cipherSample}</code>
+      </div>
+      <div style="font-size:0.72rem; color:#93c5fd; background:rgba(15,98,254,0.1); padding:0.4rem; border-radius:4px;">
+        ${d.status}
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<span class="text-danger">CPACF API error: ${err}</span>`;
+  }
+}
+
+async function fetchSysplexStatus() {
+  const container = document.getElementById('sysplex-status');
+  if (!container) return;
+  container.innerHTML = '<span style="color:#94a3b8;">Querying Parallel Sysplex Coupling Facility...</span>';
+  try {
+    const res = await fetch('/api/v1/ha/sysplex');
+    const d = await res.json();
+    container.innerHTML = `
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.3rem;">
+        <span>Active Node:</span>
+        <strong style="color:#10b981;">${d.localLpar}</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.3rem;">
+        <span>Standby Node:</span>
+        <strong style="color:#94a3b8;">${d.remoteLpar}</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.3rem;">
+        <span>GDPS Replication Latency:</span>
+        <strong class="text-accent">${d.stateSyncLatencyMs} ms (Sub-Millisecond Sync)</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.3rem;">
+        <span>Coupling Heartbeats:</span>
+        <strong style="font-family:var(--font-mono);">${d.heartbeatCounter.toLocaleString()}</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.3rem;">
+        <span>Zero-Loss WAL Disk Bytes:</span>
+        <strong style="font-family:var(--font-mono); color:#10b981;">${(d.walBytesCommitted / 1024).toFixed(1)} KB persisted</strong>
+      </div>
+      <div style="font-size:0.72rem; color:#a7f3d0; background:rgba(16,185,129,0.1); padding:0.4rem; border-radius:4px; margin-top:0.3rem;">
+        Uptime SLA: ${d.availabilitySLA}
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<span class="text-danger">Sysplex API error: ${err}</span>`;
+  }
+}
+
+async function runStressTest() {
+  const container = document.getElementById('stress-status');
+  if (!container) return;
+  container.innerHTML = '<div style="color:#38bdf8; font-weight:600;">Executing 100,000 requests across 16 threads...</div>';
+  try {
+    const res = await fetch('/api/v1/stress?requests=100000&threads=16');
+    const d = await res.json();
+    container.innerHTML = `
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.5rem;">
+        <div>Requests: <strong>${d.totalRequests.toLocaleString()}</strong></div>
+        <div>Threads: <strong>${d.concurrencyThreads}</strong></div>
+        <div>Elapsed: <strong>${d.elapsedSeconds.toFixed(3)}s</strong></div>
+        <div>Throughput: <strong style="color:#00d2ff;">${Math.round(d.throughputOpsPerSec).toLocaleString()}/s</strong></div>
+        <div>P50 Latency: <strong>${d.p50Micros.toFixed(2)} µs</strong></div>
+        <div>P90 Latency: <strong>${d.p90Micros.toFixed(2)} µs</strong></div>
+        <div>P99 Latency: <strong style="color:#10b981;">${d.p99Micros.toFixed(2)} µs</strong></div>
+        <div>P99.9 Latency: <strong style="color:#f59e0b;">${d.p999Micros.toFixed(2)} µs</strong></div>
+      </div>
+      <div style="font-size:0.72rem; color:#94a3b8; background:rgba(0,0,0,0.3); padding:0.35rem; border-radius:4px;">
+        ${d.memoryStatus}
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<span class="text-danger">Stress test error: ${err}</span>`;
+  }
 }

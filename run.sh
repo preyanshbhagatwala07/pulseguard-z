@@ -4,7 +4,7 @@ set -e
 
 echo "==================================================="
 echo "  PulseGuard-Z: LinuxONE / s390x Execution Engine  "
-echo "  National Health & ABDM FHIR R4 Edition           "
+echo "  Enterprise Edition: IBM Telum, CPACF, Sysplex GDPS"
 echo "==================================================="
 
 ARCH=$(uname -m)
@@ -18,6 +18,10 @@ mkdir -p target/classes
 echo "[INFO] Compiling Java classes..."
 javac -d target/classes -sourcepath src/main/java \
     src/main/java/com/ibmz/pulseguard/*.java \
+    src/main/java/com/ibmz/pulseguard/security/*.java \
+    src/main/java/com/ibmz/pulseguard/storage/*.java \
+    src/main/java/com/ibmz/pulseguard/ha/*.java \
+    src/main/java/com/ibmz/pulseguard/stress/*.java \
     src/main/java/com/ibmz/pulseguard/abdm/*.java \
     src/main/java/com/ibmz/pulseguard/clinical/*.java \
     src/main/java/com/ibmz/pulseguard/audit/*.java \

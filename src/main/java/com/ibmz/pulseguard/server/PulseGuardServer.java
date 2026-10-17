@@ -5,12 +5,17 @@ import com.ibmz.pulseguard.abdm.AbhaValidator;
 import com.ibmz.pulseguard.audit.CryptographicAuditLedger;
 import com.ibmz.pulseguard.clinical.News2Calculator;
 import com.ibmz.pulseguard.engine.SepsisRiskEngine;
+import com.ibmz.pulseguard.engine.TelumVectorNeuralEngine;
+import com.ibmz.pulseguard.ha.SysplexClusterManager;
 import com.ibmz.pulseguard.model.PatientBed;
 import com.ibmz.pulseguard.model.PatientVital;
 import com.ibmz.pulseguard.model.TriageAlert;
+import com.ibmz.pulseguard.report.AbdmReferralSlipGenerator;
+import com.ibmz.pulseguard.security.CpacfPervasiveEncryption;
 import com.ibmz.pulseguard.service.BenchmarkService;
 import com.ibmz.pulseguard.service.TelemetrySimulator;
-import com.ibmz.pulseguard.report.AbdmReferralSlipGenerator;
+import com.ibmz.pulseguard.storage.MemoryMappedWal;
+import com.ibmz.pulseguard.stress.EnterpriseStressHarness;
 import com.ibmz.pulseguard.teleicu.DistrictTriageRouter;
 import com.ibmz.pulseguard.teleicu.GsmSmsDispatcher;
 import com.sun.net.httpserver.HttpExchange;
@@ -24,8 +29,8 @@ import java.util.List;
 import java.util.concurrent.Executors;
 
 /**
- * PulseGuardServer: Production REST Server with ABDM FHIR R4, Cryptographic Audit Ledger,
- * and District Tele-ICU Escalation.
+ * PulseGuardServer: Production REST Server with IBM Telum AI, CPACF Pervasive Encryption,
+ * Parallel Sysplex High Availability, ABDM FHIR R4, and Medico-Legal Audit Ledger.
  */
 public class PulseGuardServer {
 
@@ -33,14 +38,21 @@ public class PulseGuardServer {
     private final TelemetrySimulator simulator;
     private final CryptographicAuditLedger auditLedger;
     private final DistrictTriageRouter triageRouter;
+    private final CpacfPervasiveEncryption cpacf;
+    private final SysplexClusterManager sysplex;
+    private final MemoryMappedWal wal;
     private HttpServer server;
 
     public PulseGuardServer(int port, TelemetrySimulator simulator,
-                            CryptographicAuditLedger auditLedger, DistrictTriageRouter triageRouter) {
+                            CryptographicAuditLedger auditLedger, DistrictTriageRouter triageRouter,
+                            CpacfPervasiveEncryption cpacf, SysplexClusterManager sysplex, MemoryMappedWal wal) {
         this.port = port;
         this.simulator = simulator;
         this.auditLedger = auditLedger;
         this.triageRouter = triageRouter;
+        this.cpacf = cpacf;
+        this.sysplex = sysplex;
+        this.wal = wal;
     }
 
     public void start() throws IOException {
@@ -54,6 +66,10 @@ public class PulseGuardServer {
         server.createContext("/api/v1/teleicu", new TeleIcuHandler());
         server.createContext("/api/v1/referral", new ReferralHandler());
         server.createContext("/api/v1/sms", new SmsHandler());
+        server.createContext("/api/v1/telum/neural", new TelumHandler());
+        server.createContext("/api/v1/security/cpacf", new CpacfHandler());
+        server.createContext("/api/v1/ha/sysplex", new SysplexHandler());
+        server.createContext("/api/v1/stress", new StressHandler());
         server.createContext("/api/v1/benchmark", new BenchmarkHandler());
         server.createContext("/api/v1/system", new SystemHandler());
         server.createContext("/", new StaticFileHandler());
@@ -61,10 +77,9 @@ public class PulseGuardServer {
         server.start();
         System.out.println(">>> PulseGuard-Z Server running on port " + port);
         System.out.println(">>> Clinical Dashboard: http://localhost:" + port + "/");
-        System.out.println(">>> FHIR R4 Endpoint:  http://localhost:" + port + "/api/v1/fhir?bedId=BED-03");
-        System.out.println(">>> Referral Slip API: http://localhost:" + port + "/api/v1/referral?bedId=BED-03");
-        System.out.println(">>> Offline SMS API:   http://localhost:" + port + "/api/v1/sms?bedId=BED-03");
-        System.out.println(">>> Audit Chain API:   http://localhost:" + port + "/api/v1/audit/chain");
+        System.out.println(">>> IBM Telum NNPA API: http://localhost:" + port + "/api/v1/telum/neural?bedId=BED-03");
+        System.out.println(">>> CPACF Security API: http://localhost:" + port + "/api/v1/security/cpacf");
+        System.out.println(">>> Sysplex GDPS HA:    http://localhost:" + port + "/api/v1/ha/sysplex");
     }
 
     public void stop() {
@@ -150,6 +165,150 @@ public class PulseGuardServer {
 
             sb.append("]}");
             sendResponse(exchange, 200, "application/json", sb.toString());
+        }
+    }
+
+    private class TelumHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendCors(exchange);
+                return;
+            }
+
+            String query = exchange.getRequestURI().getQuery();
+            String targetBed = "BED-03";
+            if (query != null && query.contains("bedId=")) {
+                targetBed = query.split("bedId=")[1].split("&")[0];
+            }
+
+            PatientBed bed = simulator.getBed(targetBed);
+            if (bed == null || bed.getLatestVital() == null) {
+                sendResponse(exchange, 404, "application/json", "{\"error\":\"Bed not found.\"}");
+                return;
+            }
+
+            TelumVectorNeuralEngine.NeuralPrediction pred = TelumVectorNeuralEngine.forward(bed.getLatestVital());
+
+            String json = String.format(java.util.Locale.US,
+                "{" +
+                "\"bedId\":\"%s\"," +
+                "\"patientId\":\"%s\"," +
+                "\"sepsisRiskProbability\":%.4f," +
+                "\"fourHourMortalityRisk\":%.4f," +
+                "\"twelveHourOrganFailureHazard\":%.4f," +
+                "\"inferenceLatencyNanos\":%.0f," +
+                "\"inferenceLatencyMicros\":%.3f," +
+                "\"telumHardwareStatus\":\"%s\"" +
+                "}",
+                bed.getBedId(), bed.getPatientId(),
+                pred.sepsisRiskProbability, pred.fourHourMortalityRisk, pred.twelveHourOrganFailureHazard,
+                pred.inferenceLatencyNanos, pred.inferenceLatencyNanos / 1000.0,
+                escapeJson(pred.accelerationMode)
+            );
+
+            sendResponse(exchange, 200, "application/json", json);
+        }
+    }
+
+    private class CpacfHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendCors(exchange);
+                return;
+            }
+
+            PatientBed bed = simulator.getBed("BED-03");
+            String sampleTelemetry = (bed != null && bed.getLatestVital() != null)
+                ? String.format("HR:%.0f,BP:%.0f/%.0f,LACT:%.1f,ABHA:%s", bed.getLatestVital().getHeartRate(),
+                                bed.getLatestVital().getSystolicBp(), bed.getLatestVital().getDiastolicBp(),
+                                bed.getLatestVital().getLactate(), bed.getAbhaId())
+                : "HR:130,BP:80/45,LACT:4.8,ABHA:91-1049-5829-3910";
+
+            CpacfPervasiveEncryption.EncryptedPayload enc = cpacf.encrypt(sampleTelemetry);
+
+            String json = "{" +
+                "\"algorithm\":\"AES-256-GCM\"," +
+                "\"hardwareAccelerationActive\":" + cpacf.isHardwareAccelerated() + "," +
+                "\"status\":\"" + escapeJson(enc.cpacfHardwareStatus) + "\"," +
+                "\"encryptionLatencyNanos\":" + enc.encryptionDurationNanos + "," +
+                "\"encryptionLatencyMicros\":" + String.format(java.util.Locale.US, "%.3f", enc.encryptionDurationNanos / 1000.0) + "," +
+                "\"cipherSample\":\"" + enc.cipherTextBase64.substring(0, Math.min(32, enc.cipherTextBase64.length())) + "...\"," +
+                "\"gcmIv\":\"" + enc.ivBase64 + "\"" +
+                "}";
+
+            sendResponse(exchange, 200, "application/json", json);
+        }
+    }
+
+    private class SysplexHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendCors(exchange);
+                return;
+            }
+
+            SysplexClusterManager.ClusterStatus cs = sysplex.getStatus();
+
+            String json = "{" +
+                "\"clusterType\":\"IBM Z Parallel Sysplex & Active-Active GDPS\"," +
+                "\"localLpar\":\"" + escapeJson(cs.localLparId) + "\"," +
+                "\"remoteLpar\":\"" + escapeJson(cs.remoteLparId) + "\"," +
+                "\"role\":\"" + cs.currentRole.name() + "\"," +
+                "\"couplingFacilityConnected\":" + cs.isCouplingFacilityConnected + "," +
+                "\"heartbeatCounter\":" + cs.replicationHeartbeatCounter + "," +
+                "\"stateSyncLatencyMs\":" + cs.stateSyncLatencyMs + "," +
+                "\"availabilitySLA\":\"" + escapeJson(cs.uptimeAvailability) + "\"," +
+                "\"walBytesCommitted\":" + wal.getTotalBytesWritten() +
+                "}";
+
+            sendResponse(exchange, 200, "application/json", json);
+        }
+    }
+
+    private class StressHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendCors(exchange);
+                return;
+            }
+
+            String query = exchange.getRequestURI().getQuery();
+            int reqs = 100_000;
+            int threads = 16;
+            if (query != null) {
+                if (query.contains("requests=")) {
+                    try { reqs = Integer.parseInt(query.split("requests=")[1].split("&")[0]); } catch (Exception ignored) {}
+                }
+                if (query.contains("threads=")) {
+                    try { threads = Integer.parseInt(query.split("threads=")[1].split("&")[0]); } catch (Exception ignored) {}
+                }
+            }
+
+            EnterpriseStressHarness.StressReport r = EnterpriseStressHarness.runStressTest(reqs, threads);
+
+            String json = String.format(java.util.Locale.US,
+                "{" +
+                "\"totalRequests\":%d," +
+                "\"concurrencyThreads\":%d," +
+                "\"elapsedSeconds\":%.3f," +
+                "\"throughputOpsPerSec\":%.0f," +
+                "\"p50Micros\":%.3f," +
+                "\"p90Micros\":%.3f," +
+                "\"p99Micros\":%.3f," +
+                "\"p999Micros\":%.3f," +
+                "\"maxMicros\":%.3f," +
+                "\"memoryStatus\":\"%s\"" +
+                "}",
+                r.totalRequests, r.concurrencyThreads, r.elapsedSeconds,
+                r.throughputOpsPerSec, r.p50Micros, r.p90Micros, r.p99Micros, r.p999Micros, r.maxMicros,
+                escapeJson(r.memoryStatus)
+            );
+
+            sendResponse(exchange, 200, "application/json", json);
         }
     }
 
@@ -361,9 +520,10 @@ public class PulseGuardServer {
             TriageAlert alert = SepsisRiskEngine.evaluate(vital);
             News2Calculator.News2Report news2 = News2Calculator.calculate(vital);
 
-            // Audit log
+            // Audit log & WAL persistence
             auditLedger.logDecision(pId, abha, bId, alert.getLevel().name(), news2.totalScore,
                     alert.getSepsisRiskScore(), alert.getInferenceLatencyMicros());
+            wal.append(vital, news2.totalScore, alert.getSepsisRiskScore());
 
             StringBuilder res = new StringBuilder();
             res.append("{");
@@ -435,9 +595,10 @@ public class PulseGuardServer {
             String res = "{" +
                 "\"service\":\"PulseGuard-Z National Health Edition\"," +
                 "\"compliance\":\"ABDM & FHIR R4 Ready\"," +
-                "\"version\":\"2.0.0-IBM-Z\"," +
+                "\"version\":\"3.0.0-IBM-Z-TELUM\"," +
                 "\"architecture\":\"" + arch + "\"," +
                 "\"isLinuxONE\":" + ("s390x".equalsIgnoreCase(arch)) + "," +
+                "\"features\":[\"IBM Telum NNPA Matrix AI\",\"CPACF AES-256 Pervasive Encryption\",\"Parallel Sysplex Active-Active GDPS\",\"MemoryMapped WAL Zero-Loss Persistence\",\"ABDM FHIR R4 Standard\"]," +
                 "\"jvm\":\"" + System.getProperty("java.version") + " (" + System.getProperty("java.vendor") + ")\"," +
                 "\"os\":\"" + System.getProperty("os.name") + " " + System.getProperty("os.version") + "\"," +
                 "\"cores\":" + Runtime.getRuntime().availableProcessors() + "," +

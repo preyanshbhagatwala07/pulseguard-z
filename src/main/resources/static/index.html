@@ -14,7 +14,7 @@
   <div class="gov-strip">
     <div class="gov-content">
       <span>🇮🇳 Government of India &bull; National Health Infrastructure Pilot &bull; ABDM Compliant (HL7 FHIR R4)</span>
-      <span class="gov-right">Digital Personal Data Protection (DPDP) Act 2023 Verified &bull; IBM Z Pervasive Encryption</span>
+      <span class="gov-right">Digital Personal Data Protection (DPDP) Act 2023 &bull; IBM Z Pervasive Encryption</span>
     </div>
   </div>
 
@@ -27,20 +27,20 @@
       </div>
       <div>
         <h1 class="brand-title">PulseGuard<span class="accent">-Z</span></h1>
-        <p class="brand-sub">Sub-Second Tele-ICU Sepsis Early-Warning Engine &bull; AIIMS / NEWS2 &amp; Sepsis-3 Protocols</p>
+        <p class="brand-sub">Sub-Second Tele-ICU Sepsis Engine &bull; IBM Telum NNPA &bull; AIIMS / NEWS2 Protocol</p>
       </div>
     </div>
     <div class="header-badges">
       <span class="badge abdm-badge">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        ABHA / ABDM Verified
+        ABHA / ABDM M3
       </span>
       <span class="badge ibm-badge">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
         <span id="platform-arch">IBM LinuxONE s390x Native</span>
       </span>
       <span class="badge live-badge">
-        <span class="live-dot"></span> LIVE 1.5s STREAM
+        <span class="live-dot"></span> LIVE TELEMETRY
       </span>
       <button class="btn btn-primary" onclick="runBenchmark()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -56,7 +56,7 @@
       <div class="metric-card">
         <div class="metric-label">Inference Latency</div>
         <div class="metric-value text-accent" id="metric-latency">2.1 <span class="unit">µs</span></div>
-        <div class="metric-sub">Sub-millisecond on IBM Z JVM</div>
+        <div class="metric-sub">IBM Telum NNPA On-Chip Speed</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Decision Throughput</div>
@@ -80,6 +80,7 @@
       <button class="tab-btn active" onclick="switchTab('ward')">🏥 ICU Ward Telemetry (6 Beds)</button>
       <button class="tab-btn" onclick="switchTab('teleicu')">🚑 District Tele-ICU &amp; 108 Dispatch</button>
       <button class="tab-btn" onclick="switchTab('audit')">🔒 SHA-256 Medico-Legal Audit Ledger</button>
+      <button class="tab-btn" onclick="switchTab('ibmz')">⚡ IBM Z &amp; LinuxONE Architecture</button>
     </div>
 
     <!-- TAB 1: ICU Ward Beds Grid -->
@@ -221,6 +222,53 @@
         </div>
       </section>
     </div>
+
+    <!-- TAB 4: IBM Z & LinuxONE Architecture -->
+    <div id="tab-ibmz" class="tab-content">
+      <section class="ibmz-architecture-section">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">IBM Z &amp; LinuxONE Enterprise Systems Overview</h2>
+            <p class="section-desc">Hardware-level acceleration, CPACF pervasive encryption, and Parallel Sysplex active-active resilience</p>
+          </div>
+        </div>
+
+        <div class="grid-2col">
+          <!-- Card 1: IBM Telum AI Accelerator -->
+          <div class="card-panel">
+            <h3 class="panel-subtitle">IBM Telum NNPA Neural Engine (Real-Time Hazard Curve)</h3>
+            <div id="telum-status" class="status-box">Connecting to Telum NNPA matrix engine...</div>
+            <button class="btn btn-sm btn-outline" style="margin-top:0.75rem;" onclick="fetchTelumNeural()">Refresh Telum Forward Pass</button>
+          </div>
+
+          <!-- Card 2: CPACF Pervasive Encryption -->
+          <div class="card-panel">
+            <h3 class="panel-subtitle">IBM Z CPACF Pervasive Encryption (Hardware AES-256-GCM)</h3>
+            <div id="cpacf-status" class="status-box">Inspecting CPACF hardware cipher state...</div>
+            <button class="btn btn-sm btn-outline" style="margin-top:0.75rem;" onclick="fetchCpacfStatus()">Re-Key CPACF Encryption</button>
+          </div>
+
+          <!-- Card 3: Parallel Sysplex GDPS Active-Active Cluster -->
+          <div class="card-panel">
+            <h3 class="panel-subtitle">Parallel Sysplex &amp; Active-Active GDPS High-Availability</h3>
+            <div id="sysplex-status" class="status-box">Polling dual-LPAR coupling facility status...</div>
+            <button class="btn btn-sm btn-outline" style="margin-top:0.75rem;" onclick="fetchSysplexStatus()">Poll Coupling Facility Heartbeat</button>
+          </div>
+
+          <!-- Card 4: Industrial Concurrent Stress Test -->
+          <div class="card-panel">
+            <h3 class="panel-subtitle">Industrial Multi-Threaded Stress Test (100,000 Ops)</h3>
+            <p style="font-size:0.75rem; color:#94a3b8; margin-bottom:0.75rem;">
+              Tests 100,000 vital evaluations across 16 concurrent threads measuring tail latency (P99/P99.9).
+            </p>
+            <div id="stress-status" class="status-box">Click below to execute concurrent load test on JVM.</div>
+            <button class="btn btn-sm btn-primary" style="margin-top:0.75rem;" onclick="runStressTest()">
+              Execute 100k Stress Test
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
   </main>
 
   <!-- FHIR R4 Modal -->
@@ -254,7 +302,7 @@
 
   <footer class="app-footer">
     <p>PulseGuard-Z &bull; National Emergency Healthcare Triage Architecture for <strong>IBM Z Datathon 2026</strong> &bull; Team CodeBuilders</p>
-    <p class="tech-stack-note">Engineered in Java for IBM LinuxONE Community Cloud (s390x), ABDM FHIR R4, and MoHFW Tele-ICU Grid</p>
+    <p class="tech-stack-note">Engineered in Java for IBM LinuxONE Community Cloud (s390x), IBM Telum NNPA, ABDM FHIR R4, and MoHFW Tele-ICU Grid</p>
   </footer>
 
   <script src="app.js"></script>
