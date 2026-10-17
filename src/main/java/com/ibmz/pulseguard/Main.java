@@ -1,8 +1,10 @@
 package com.ibmz.pulseguard;
 
+import com.ibmz.pulseguard.audit.CryptographicAuditLedger;
 import com.ibmz.pulseguard.server.PulseGuardServer;
 import com.ibmz.pulseguard.service.BenchmarkService;
 import com.ibmz.pulseguard.service.TelemetrySimulator;
+import com.ibmz.pulseguard.teleicu.DistrictTriageRouter;
 
 public class Main {
 
@@ -26,12 +28,15 @@ public class Main {
         System.out.println("[SECURITY]  Pervasive Encryption mode active for patient vitals in-flight & at-rest.");
         System.out.println("--------------------------------------------------------------------------------");
 
-        TelemetrySimulator simulator = new TelemetrySimulator();
+        CryptographicAuditLedger auditLedger = new CryptographicAuditLedger();
+        DistrictTriageRouter triageRouter = new DistrictTriageRouter();
+        TelemetrySimulator simulator = new TelemetrySimulator(auditLedger, triageRouter);
+
         PulseGuardServer server = null;
         int[] tryPorts = { port, 8085, 9090, 8000 };
         for (int p : tryPorts) {
             try {
-                server = new PulseGuardServer(p, simulator);
+                server = new PulseGuardServer(p, simulator, auditLedger, triageRouter);
                 server.start();
                 port = p;
                 break;

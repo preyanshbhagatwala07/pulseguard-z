@@ -1,11 +1,16 @@
 package com.ibmz.pulseguard.server;
 
+import com.ibmz.pulseguard.abdm.AbdmFhirParser;
+import com.ibmz.pulseguard.abdm.AbhaValidator;
+import com.ibmz.pulseguard.audit.CryptographicAuditLedger;
+import com.ibmz.pulseguard.clinical.News2Calculator;
 import com.ibmz.pulseguard.engine.SepsisRiskEngine;
 import com.ibmz.pulseguard.model.PatientBed;
 import com.ibmz.pulseguard.model.PatientVital;
 import com.ibmz.pulseguard.model.TriageAlert;
 import com.ibmz.pulseguard.service.BenchmarkService;
 import com.ibmz.pulseguard.service.TelemetrySimulator;
+import com.ibmz.pulseguard.teleicu.DistrictTriageRouter;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -17,18 +22,23 @@ import java.util.List;
 import java.util.concurrent.Executors;
 
 /**
- * PulseGuardServer: Lightweight embedded HTTP server delivering real-time REST APIs
- * and the clinical triage web UI.
+ * PulseGuardServer: Production REST Server with ABDM FHIR R4, Cryptographic Audit Ledger,
+ * and District Tele-ICU Escalation.
  */
 public class PulseGuardServer {
 
     private final int port;
     private final TelemetrySimulator simulator;
+    private final CryptographicAuditLedger auditLedger;
+    private final DistrictTriageRouter triageRouter;
     private HttpServer server;
 
-    public PulseGuardServer(int port, TelemetrySimulator simulator) {
+    public PulseGuardServer(int port, TelemetrySimulator simulator,
+                            CryptographicAuditLedger auditLedger, DistrictTriageRouter triageRouter) {
         this.port = port;
         this.simulator = simulator;
+        this.auditLedger = auditLedger;
+        this.triageRouter = triageRouter;
     }
 
     public void start() throws IOException {
@@ -37,14 +47,18 @@ public class PulseGuardServer {
 
         server.createContext("/api/v1/beds", new BedsHandler());
         server.createContext("/api/v1/telemetry", new TelemetryHandler());
+        server.createContext("/api/v1/fhir", new FhirHandler());
+        server.createContext("/api/v1/audit/chain", new AuditHandler());
+        server.createContext("/api/v1/teleicu", new TeleIcuHandler());
         server.createContext("/api/v1/benchmark", new BenchmarkHandler());
         server.createContext("/api/v1/system", new SystemHandler());
         server.createContext("/", new StaticFileHandler());
 
         server.start();
-        System.out.println(">>> PulseGuard-Z Server successfully started on port " + port);
+        System.out.println(">>> PulseGuard-Z Server running on port " + port);
         System.out.println(">>> Clinical Dashboard: http://localhost:" + port + "/");
-        System.out.println(">>> Real-Time API:     http://localhost:" + port + "/api/v1/beds");
+        System.out.println(">>> FHIR R4 Endpoint:  http://localhost:" + port + "/api/v1/fhir?bedId=BED-03");
+        System.out.println(">>> Audit Chain API:   http://localhost:" + port + "/api/v1/audit/chain");
     }
 
     public void stop() {
@@ -71,36 +85,49 @@ public class PulseGuardServer {
                 PatientBed b = beds.get(i);
                 PatientVital v = b.getLatestVital();
                 TriageAlert a = b.getCurrentAlert();
+                News2Calculator.News2Report n = b.getCurrentNews2();
 
                 if (i > 0) sb.append(",");
                 sb.append("{");
                 sb.append("\"bedId\":\"").append(b.getBedId()).append("\",");
                 sb.append("\"patientId\":\"").append(b.getPatientId()).append("\",");
+                sb.append("\"abhaId\":\"").append(b.getAbhaId()).append("\",");
                 sb.append("\"patientName\":\"").append(b.getPatientName()).append("\",");
                 sb.append("\"age\":").append(b.getAge()).append(",");
-                sb.append("\"diagnosis\":\"").append(b.getPrimaryDiagnosis()).append("\",");
+                sb.append("\"gender\":\"").append(b.getGender()).append("\",");
+                sb.append("\"facility\":\"").append(escapeJson(b.getFacilityName())).append("\",");
+                sb.append("\"diagnosis\":\"").append(escapeJson(b.getPrimaryDiagnosis())).append("\",");
+
+                if (n != null) {
+                    sb.append("\"news2\":{");
+                    sb.append("\"score\":").append(n.totalScore).append(",");
+                    sb.append("\"category\":\"").append(n.riskCategory).append("\",");
+                    sb.append("\"redFlag\":").append(n.hasIndividualRedFlag).append(",");
+                    sb.append("\"response\":\"").append(escapeJson(n.clinicalResponse)).append("\"");
+                    sb.append("},");
+                }
 
                 if (v != null) {
                     sb.append("\"vital\":{");
-                    sb.append("\"heartRate\":").append(String.format("%.1f", v.getHeartRate())).append(",");
-                    sb.append("\"systolicBp\":").append(String.format("%.1f", v.getSystolicBp())).append(",");
-                    sb.append("\"diastolicBp\":").append(String.format("%.1f", v.getDiastolicBp())).append(",");
-                    sb.append("\"respRate\":").append(String.format("%.1f", v.getRespRate())).append(",");
-                    sb.append("\"temperatureC\":").append(String.format("%.1f", v.getTemperatureC())).append(",");
-                    sb.append("\"spO2\":").append(String.format("%.1f", v.getSpO2())).append(",");
-                    sb.append("\"lactate\":").append(String.format("%.2f", v.getLactate())).append(",");
-                    sb.append("\"whiteBloodCell\":").append(String.format("%.1f", v.getWhiteBloodCell())).append(",");
-                    sb.append("\"map\":").append(String.format("%.1f", v.getMeanArterialPressure())).append(",");
-                    sb.append("\"shockIndex\":").append(String.format("%.2f", v.getShockIndex()));
+                    sb.append("\"heartRate\":").append(String.format(java.util.Locale.US, "%.1f", v.getHeartRate())).append(",");
+                    sb.append("\"systolicBp\":").append(String.format(java.util.Locale.US, "%.1f", v.getSystolicBp())).append(",");
+                    sb.append("\"diastolicBp\":").append(String.format(java.util.Locale.US, "%.1f", v.getDiastolicBp())).append(",");
+                    sb.append("\"respRate\":").append(String.format(java.util.Locale.US, "%.1f", v.getRespRate())).append(",");
+                    sb.append("\"temperatureC\":").append(String.format(java.util.Locale.US, "%.1f", v.getTemperatureC())).append(",");
+                    sb.append("\"spO2\":").append(String.format(java.util.Locale.US, "%.1f", v.getSpO2())).append(",");
+                    sb.append("\"lactate\":").append(String.format(java.util.Locale.US, "%.2f", v.getLactate())).append(",");
+                    sb.append("\"whiteBloodCell\":").append(String.format(java.util.Locale.US, "%.1f", v.getWhiteBloodCell())).append(",");
+                    sb.append("\"map\":").append(String.format(java.util.Locale.US, "%.1f", v.getMeanArterialPressure())).append(",");
+                    sb.append("\"shockIndex\":").append(String.format(java.util.Locale.US, "%.2f", v.getShockIndex()));
                     sb.append("},");
                 }
 
                 if (a != null) {
                     sb.append("\"alert\":{");
                     sb.append("\"level\":\"").append(a.getLevel().name()).append("\",");
-                    sb.append("\"riskScore\":").append(String.format("%.3f", a.getSepsisRiskScore())).append(",");
-                    sb.append("\"mortalityRisk\":").append(String.format("%.3f", a.getFourHourMortalityRisk())).append(",");
-                    sb.append("\"latencyMicros\":").append(String.format("%.2f", a.getInferenceLatencyMicros())).append(",");
+                    sb.append("\"riskScore\":").append(String.format(java.util.Locale.US, "%.3f", a.getSepsisRiskScore())).append(",");
+                    sb.append("\"mortalityRisk\":").append(String.format(java.util.Locale.US, "%.3f", a.getFourHourMortalityRisk())).append(",");
+                    sb.append("\"latencyMicros\":").append(String.format(java.util.Locale.US, "%.2f", a.getInferenceLatencyMicros())).append(",");
                     sb.append("\"recommendation\":\"").append(escapeJson(a.getClinicalRecommendation())).append("\",");
                     sb.append("\"biomarkers\":[");
                     List<String> bio = a.getContributingBiomarkers();
@@ -120,7 +147,122 @@ public class PulseGuardServer {
         }
     }
 
-    private static class TelemetryHandler implements HttpHandler {
+    private class FhirHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendCors(exchange);
+                return;
+            }
+
+            String query = exchange.getRequestURI().getQuery();
+            String targetBed = "BED-03";
+            if (query != null && query.contains("bedId=")) {
+                targetBed = query.split("bedId=")[1].split("&")[0];
+            }
+
+            PatientBed bed = simulator.getBed(targetBed);
+            if (bed == null || bed.getLatestVital() == null) {
+                sendResponse(exchange, 404, "application/json", "{\"error\":\"Bed not found or no vitals yet.\"}");
+                return;
+            }
+
+            String fhirJson = AbdmFhirParser.toFhirR4Bundle(
+                bed.getLatestVital(), bed.getCurrentAlert(), bed.getAbhaId(), bed.getFacilityName()
+            );
+
+            sendResponse(exchange, 200, "application/fhir+json", fhirJson);
+        }
+    }
+
+    private class AuditHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendCors(exchange);
+                return;
+            }
+
+            List<CryptographicAuditLedger.AuditEntry> chain = auditLedger.getRecentAuditChain(25);
+            boolean isIntegrityVerified = auditLedger.verifyIntegrity();
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("{");
+            sb.append("\"cryptographicIntegrityVerified\":").append(isIntegrityVerified).append(",");
+            sb.append("\"chainLength\":").append(chain.size()).append(",");
+            sb.append("\"ledger\":[");
+
+            for (int i = 0; i < chain.size(); i++) {
+                CryptographicAuditLedger.AuditEntry e = chain.get(i);
+                if (i > 0) sb.append(",");
+                sb.append("{");
+                sb.append("\"index\":").append(e.index).append(",");
+                sb.append("\"timestamp\":").append(e.timestamp).append(",");
+                sb.append("\"patientId\":\"").append(e.patientId).append("\",");
+                sb.append("\"abhaId\":\"").append(e.abhaId).append("\",");
+                sb.append("\"bedId\":\"").append(e.bedId).append("\",");
+                sb.append("\"triageLevel\":\"").append(e.triageLevel).append("\",");
+                sb.append("\"news2Score\":").append(e.news2Score).append(",");
+                sb.append("\"sepsisRiskScore\":").append(String.format(java.util.Locale.US, "%.3f", e.sepsisRiskScore)).append(",");
+                sb.append("\"previousHash\":\"").append(e.previousHash).append("\",");
+                sb.append("\"entryHash\":\"").append(e.entryHash).append("\"");
+                sb.append("}");
+            }
+
+            sb.append("]}");
+            sendResponse(exchange, 200, "application/json", sb.toString());
+        }
+    }
+
+    private class TeleIcuHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendCors(exchange);
+                return;
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("{");
+            sb.append("\"facilities\":[");
+            List<DistrictTriageRouter.HealthFacility> facs = triageRouter.getNetwork();
+            for (int i = 0; i < facs.size(); i++) {
+                DistrictTriageRouter.HealthFacility f = facs.get(i);
+                if (i > 0) sb.append(",");
+                sb.append("{");
+                sb.append("\"code\":\"").append(f.facilityCode).append("\",");
+                sb.append("\"name\":\"").append(escapeJson(f.name)).append("\",");
+                sb.append("\"tier\":\"").append(f.tier).append("\",");
+                sb.append("\"district\":\"").append(f.district).append("\",");
+                sb.append("\"totalBeds\":").append(f.totalBeds).append(",");
+                sb.append("\"availableIcuBeds\":").append(f.availableIcuBeds);
+                sb.append("}");
+            }
+            sb.append("],");
+
+            sb.append("\"active108Dispatches\":[");
+            List<DistrictTriageRouter.DispatchOrder> disps = triageRouter.getActiveDispatches();
+            for (int i = 0; i < disps.size(); i++) {
+                DistrictTriageRouter.DispatchOrder d = disps.get(i);
+                if (i > 0) sb.append(",");
+                sb.append("{");
+                sb.append("\"dispatchId\":\"").append(d.dispatchId).append("\",");
+                sb.append("\"patientId\":\"").append(d.patientId).append("\",");
+                sb.append("\"abhaId\":\"").append(d.abhaId).append("\",");
+                sb.append("\"originating\":\"").append(escapeJson(d.originatingFacility)).append("\",");
+                sb.append("\"destination\":\"").append(escapeJson(d.destinationHospital)).append("\",");
+                sb.append("\"ambulanceUnit\":\"").append(d.ambulanceUnitId).append("\",");
+                sb.append("\"etaMinutes\":").append(d.etaMinutes).append(",");
+                sb.append("\"orders\":\"").append(escapeJson(d.immediateStabilizationOrders)).append("\"");
+                sb.append("}");
+            }
+            sb.append("]}");
+
+            sendResponse(exchange, 200, "application/json", sb.toString());
+        }
+    }
+
+    private class TelemetryHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -135,8 +277,8 @@ public class PulseGuardServer {
 
             String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
 
-            // Simple robust key extraction from JSON
             String pId = extractJsonString(body, "patientId", "P-UNKNOWN");
+            String abha = extractJsonString(body, "abhaId", "91-0000-0000-0000");
             String bId = extractJsonString(body, "bedId", "BED-CUSTOM");
             double hr = extractJsonDouble(body, "heartRate", 80.0);
             double sbp = extractJsonDouble(body, "systolicBp", 115.0);
@@ -149,18 +291,26 @@ public class PulseGuardServer {
 
             PatientVital vital = new PatientVital(pId, bId, System.currentTimeMillis(), hr, sbp, dbp, rr, temp, spo2, lactate, wbc);
             TriageAlert alert = SepsisRiskEngine.evaluate(vital);
+            News2Calculator.News2Report news2 = News2Calculator.calculate(vital);
+
+            // Audit log
+            auditLedger.logDecision(pId, abha, bId, alert.getLevel().name(), news2.totalScore,
+                    alert.getSepsisRiskScore(), alert.getInferenceLatencyMicros());
 
             StringBuilder res = new StringBuilder();
             res.append("{");
             res.append("\"status\":\"evaluated\",");
             res.append("\"patientId\":\"").append(alert.getPatientId()).append("\",");
+            res.append("\"abhaValid\":").append(AbhaValidator.isValidAbha(abha)).append(",");
             res.append("\"bedId\":\"").append(alert.getBedId()).append("\",");
             res.append("\"triageLevel\":\"").append(alert.getLevel().name()).append("\",");
-            res.append("\"sepsisRiskScore\":").append(String.format("%.4f", alert.getSepsisRiskScore())).append(",");
-            res.append("\"fourHourMortalityRisk\":").append(String.format("%.4f", alert.getFourHourMortalityRisk())).append(",");
-            res.append("\"inferenceLatencyMicros\":").append(String.format("%.2f", alert.getInferenceLatencyMicros())).append(",");
-            res.append("\"meanArterialPressure\":").append(String.format("%.1f", vital.getMeanArterialPressure())).append(",");
-            res.append("\"shockIndex\":").append(String.format("%.2f", vital.getShockIndex())).append(",");
+            res.append("\"news2Score\":").append(news2.totalScore).append(",");
+            res.append("\"news2Category\":\"").append(news2.riskCategory).append("\",");
+            res.append("\"sepsisRiskScore\":").append(String.format(java.util.Locale.US, "%.4f", alert.getSepsisRiskScore())).append(",");
+            res.append("\"fourHourMortalityRisk\":").append(String.format(java.util.Locale.US, "%.4f", alert.getFourHourMortalityRisk())).append(",");
+            res.append("\"inferenceLatencyMicros\":").append(String.format(java.util.Locale.US, "%.2f", alert.getInferenceLatencyMicros())).append(",");
+            res.append("\"meanArterialPressure\":").append(String.format(java.util.Locale.US, "%.1f", vital.getMeanArterialPressure())).append(",");
+            res.append("\"shockIndex\":").append(String.format(java.util.Locale.US, "%.2f", vital.getShockIndex())).append(",");
             res.append("\"recommendation\":\"").append(escapeJson(alert.getClinicalRecommendation())).append("\",");
             res.append("\"biomarkers\":[");
             List<String> bio = alert.getContributingBiomarkers();
@@ -188,16 +338,16 @@ public class PulseGuardServer {
             StringBuilder res = new StringBuilder();
             res.append("{");
             res.append("\"iterations\":").append(b.iterations).append(",");
-            res.append("\"totalTimeMs\":").append(String.format("%.2f", b.totalTimeMs)).append(",");
-            res.append("\"avgLatencyMicros\":").append(String.format("%.3f", b.avgLatencyMicros)).append(",");
-            res.append("\"p50LatencyMicros\":").append(String.format("%.3f", b.p50LatencyMicros)).append(",");
-            res.append("\"p95LatencyMicros\":").append(String.format("%.3f", b.p95LatencyMicros)).append(",");
-            res.append("\"p99LatencyMicros\":").append(String.format("%.3f", b.p99LatencyMicros)).append(",");
-            res.append("\"throughputInferencesPerSec\":").append(String.format("%.0f", b.throughputInferencesPerSec)).append(",");
+            res.append("\"totalTimeMs\":").append(String.format(java.util.Locale.US, "%.2f", b.totalTimeMs)).append(",");
+            res.append("\"avgLatencyMicros\":").append(String.format(java.util.Locale.US, "%.3f", b.avgLatencyMicros)).append(",");
+            res.append("\"p50LatencyMicros\":").append(String.format(java.util.Locale.US, "%.3f", b.p50LatencyMicros)).append(",");
+            res.append("\"p95LatencyMicros\":").append(String.format(java.util.Locale.US, "%.3f", b.p95LatencyMicros)).append(",");
+            res.append("\"p99LatencyMicros\":").append(String.format(java.util.Locale.US, "%.3f", b.p99LatencyMicros)).append(",");
+            res.append("\"throughputInferencesPerSec\":").append(String.format(java.util.Locale.US, "%.0f", b.throughputInferencesPerSec)).append(",");
             res.append("\"osArch\":\"").append(b.osArch).append("\",");
             res.append("\"osName\":\"").append(b.osName).append("\",");
             res.append("\"availableCores\":").append(b.availableCores).append(",");
-            res.append("\"heapUsedMb\":").append(String.format("%.1f", b.heapUsedMb)).append(",");
+            res.append("\"heapUsedMb\":").append(String.format(java.util.Locale.US, "%.1f", b.heapUsedMb)).append(",");
             res.append("\"ibmZOptimizationStatus\":\"").append(escapeJson(b.ibmZOptimizationStatus)).append("\"");
             res.append("}");
 
@@ -215,8 +365,9 @@ public class PulseGuardServer {
 
             String arch = System.getProperty("os.arch");
             String res = "{" +
-                "\"service\":\"PulseGuard-Z Enterprise Triage\"," +
-                "\"version\":\"1.0.0-IBM-Z\"," +
+                "\"service\":\"PulseGuard-Z National Health Edition\"," +
+                "\"compliance\":\"ABDM & FHIR R4 Ready\"," +
+                "\"version\":\"2.0.0-IBM-Z\"," +
                 "\"architecture\":\"" + arch + "\"," +
                 "\"isLinuxONE\":" + ("s390x".equalsIgnoreCase(arch)) + "," +
                 "\"jvm\":\"" + System.getProperty("java.version") + " (" + System.getProperty("java.vendor") + ")\"," +
@@ -239,7 +390,6 @@ public class PulseGuardServer {
 
             InputStream is = getClass().getResourceAsStream("/static" + path);
             if (is == null) {
-                // Fallback to local filesystem if not in classpath
                 File f = new File("src/main/resources/static" + path);
                 if (f.exists()) {
                     is = new FileInputStream(f);
@@ -256,7 +406,6 @@ public class PulseGuardServer {
             else if (path.endsWith(".js")) contentType = "application/javascript; charset=UTF-8";
             else if (path.endsWith(".css")) contentType = "text/css; charset=UTF-8";
             else if (path.endsWith(".json")) contentType = "application/json; charset=UTF-8";
-            else if (path.endsWith(".svg")) contentType = "image/svg+xml";
 
             byte[] bytes = is.readAllBytes();
             is.close();
