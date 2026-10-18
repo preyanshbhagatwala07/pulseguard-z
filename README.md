@@ -202,6 +202,7 @@ chmod +x deploy_linuxone.sh verify_s390x.sh
 ---
 
 ## 👥 Team CodeBuilders
-* **Preyansh Bhagatwala** — *Lead Mainframe Systems Architect & Core Developer*
+* **Preyansh Bhagatwala** ([@preyanshbhagatwala07](https://github.com/preyanshbhagatwala07)) — *Lead Mainframe Systems Architect & Core Developer*
+* **Harshvardhan Gupta** ([@harshvardhan-gupta26](https://github.com/harshvardhan-gupta26)) — *Collaborator & Systems Contributor*
 * **Event:** IBM Z Datathon 2026 (Organized by Shooting Stars Foundation & IBM Z Ecosystem via Hack2skill)
 * **Track:** Real-Time AI for Critical Decisions
