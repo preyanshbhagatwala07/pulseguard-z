@@ -59,7 +59,7 @@ PulseGuard-Z delivers clinical, operational, and economic impact across Indian p
 ---
 
 ### Field 6: Upload your pitch deck in PDF Format
-File: `PulseGuard_Z_PitchDeck.pdf` (15.5 KB, 9 landscape slides, < 5 MB limit)
+File: `PulseGuard_Z_PitchDeck.pdf` (12.4 KB, 5 landscape slides, < 5 MB limit)
 
 ---
 
